@@ -107,12 +107,12 @@ while ! nc -z localhost 8686; do
     sleep 1
 done
 
-apiKey="$(curl \
-    -sS \
-    --retry-all-errors \
-    --retry 10 \
-    $url/initialize.json |
-    jq -r '.apiKey')"
+echo "[autoconfig] Waiting for Lidarr config file..."
+while [ ! -f /config/config.xml ]; do
+    sleep 1
+done
+
+apiKey="$(grep -oP '(?<=<ApiKey>)[^<]+' /config/config.xml)"
 
 plugin=$(apiCall "GET" "system/plugins" | jq '.[]|select(.name=="Deemix")')
 
