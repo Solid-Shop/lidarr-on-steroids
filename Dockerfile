@@ -1,31 +1,25 @@
-FROM --platform=$TARGETPLATFORM docker.io/library/node:22-alpine as deemix
+FROM --platform=$TARGETPLATFORM docker.io/library/node:24-alpine AS deemix
 
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
 RUN echo "Building for TARGETPLATFORM=$TARGETPLATFORM | BUILDPLATFORM=$BUILDPLATFORM"
-RUN apk add --no-cache git jq python3 make gcc musl-dev g++ && \
-    rm -rf /var/lib/apt/lists/*
-RUN git clone --recurse-submodules https://gitlab.com/RemixDev/deemix-gui.git && \
-    cd deemix-gui && git checkout 5d447b60
-WORKDIR /deemix-gui
-RUN case "$TARGETPLATFORM" in \
-        "linux/amd64") \
-            jq '.pkg.targets = ["node18-alpine-x64"]' ./server/package.json > tmp-json ;; \
-        "linux/arm64") \
-            jq '.pkg.targets = ["node18-alpine-arm64"]' ./server/package.json > tmp-json ;; \
-        *) \
-            echo "Platform $TARGETPLATFORM not supported" && exit 1 ;; \
-    esac && \
-    mv tmp-json /deemix-gui/server/package.json
-RUN yarn install-all
-# Patching deemix: see issue https://github.com/youegraillot/lidarr-on-steroids/issues/63
-RUN sed -i 's/const channelData = await dz.gw.get_page(channelName)/let channelData; try { channelData = await dz.gw.get_page(channelName); } catch (error) { console.error(`Caught error ${error}`); return [];}/' ./server/src/routes/api/get/newReleases.ts
-RUN yarn dist-server
-RUN mv /deemix-gui/dist/deemix-server /deemix-server
+RUN corepack enable && \
+    apk add --no-cache git python3 make g++
+RUN pnpm install -g turbo
+
+RUN git clone https://github.com/bambanah/deemix.git /app && \
+    cd /app && git checkout 26f76240b4d16cf472b51cd35fe305801a2fea27
+
+WORKDIR /app
+RUN pnpm install --frozen-lockfile
+RUN pnpm turbo build --filter=deemix-webui...
 
 
-FROM ghcr.io/hotio/lidarr:pr-plugins-2.5.2.4317
+FROM ghcr.io/hotio/lidarr:release-634da4a
 
 LABEL maintainer="youegraillot"
 
@@ -41,8 +35,8 @@ RUN apk add --no-cache ffmpeg && \
 COPY lidarr-flac2mp3/root/usr /usr
 
 # deemix
-COPY --from=deemix /deemix-server /deemix-server
-RUN chmod +x /deemix-server
+RUN apk add --no-cache nodejs
+COPY --from=deemix /app /deemix-app
 VOLUME ["/config_deemix", "/downloads"]
 EXPOSE 6595
 

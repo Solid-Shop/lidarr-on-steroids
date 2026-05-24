@@ -30,4 +30,5 @@ fi
 chown -R "$PUID:$PGID" /config_deemix
 
 echo "[services.d] Starting Deemix"
-s6-setuidgid "$PUID:$PGID" /deemix-server
+export NODE_ENV=production
+s6-setuidgid "$PUID:$PGID" node /deemix-app/packages/webui/dist/main.js
