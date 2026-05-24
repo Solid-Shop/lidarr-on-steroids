@@ -1,5 +1,3 @@
-version: '3.4'
-
 services:
   lidarr-onsteroids:
     image: youegraillot/lidarr-on-steroids

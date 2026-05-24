@@ -1,4 +1,4 @@
-FROM --platform=$TARGETPLATFORM docker.io/library/node:21-alpine as deemix
+FROM --platform=$TARGETPLATFORM docker.io/library/node:22-alpine as deemix
 
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
@@ -6,13 +6,14 @@ ARG BUILDPLATFORM
 RUN echo "Building for TARGETPLATFORM=$TARGETPLATFORM | BUILDPLATFORM=$BUILDPLATFORM"
 RUN apk add --no-cache git jq python3 make gcc musl-dev g++ && \
     rm -rf /var/lib/apt/lists/*
-RUN git clone --recurse-submodules https://gitlab.com/RemixDev/deemix-gui.git
-WORKDIR deemix-gui
+RUN git clone --recurse-submodules https://gitlab.com/RemixDev/deemix-gui.git && \
+    cd deemix-gui && git checkout 5d447b60
+WORKDIR /deemix-gui
 RUN case "$TARGETPLATFORM" in \
         "linux/amd64") \
-            jq '.pkg.targets = ["node16-alpine-x64"]' ./server/package.json > tmp-json ;; \
+            jq '.pkg.targets = ["node22-alpine-x64"]' ./server/package.json > tmp-json ;; \
         "linux/arm64") \
-            jq '.pkg.targets = ["node16-alpine-arm64"]' ./server/package.json > tmp-json ;; \
+            jq '.pkg.targets = ["node22-alpine-arm64"]' ./server/package.json > tmp-json ;; \
         *) \
             echo "Platform $TARGETPLATFORM not supported" && exit 1 ;; \
     esac && \
