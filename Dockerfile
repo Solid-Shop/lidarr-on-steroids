@@ -11,7 +11,7 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm turbo build --filter=deemix-webui...
 
 
-FROM ghcr.io/hotio/lidarr:release-634da4a
+FROM ghcr.io/hotio/lidarr:nightly-804c007
 
 LABEL maintainer="youegraillot"
 
