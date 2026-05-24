@@ -11,9 +11,9 @@ RUN git clone --recurse-submodules https://gitlab.com/RemixDev/deemix-gui.git &&
 WORKDIR /deemix-gui
 RUN case "$TARGETPLATFORM" in \
         "linux/amd64") \
-            jq '.pkg.targets = ["node22-alpine-x64"]' ./server/package.json > tmp-json ;; \
+            jq '.pkg.targets = ["node18-alpine-x64"]' ./server/package.json > tmp-json ;; \
         "linux/arm64") \
-            jq '.pkg.targets = ["node22-alpine-arm64"]' ./server/package.json > tmp-json ;; \
+            jq '.pkg.targets = ["node18-alpine-arm64"]' ./server/package.json > tmp-json ;; \
         *) \
             echo "Platform $TARGETPLATFORM not supported" && exit 1 ;; \
     esac && \
