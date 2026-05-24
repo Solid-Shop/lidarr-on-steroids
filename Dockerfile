@@ -1,15 +1,7 @@
-FROM --platform=$TARGETPLATFORM docker.io/library/node:24-alpine AS deemix
+FROM docker.io/library/node:24-alpine AS deemix
 
-ARG TARGETPLATFORM
-ARG BUILDPLATFORM
-
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-
-RUN echo "Building for TARGETPLATFORM=$TARGETPLATFORM | BUILDPLATFORM=$BUILDPLATFORM"
-RUN corepack enable && \
-    apk add --no-cache git python3 make g++
-RUN pnpm install -g turbo
+RUN apk add --no-cache git python3 make g++ && \
+    npm install -g pnpm turbo
 
 RUN git clone https://github.com/bambanah/deemix.git /app && \
     cd /app && git checkout 26f76240b4d16cf472b51cd35fe305801a2fea27
