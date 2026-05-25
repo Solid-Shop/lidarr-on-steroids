@@ -52,7 +52,6 @@ docker run \
 ### Docker Compose
 
 ```yml
-version: "3"
 services:
   lidarr:
     image: solidshop/lidarr-on-steroids
