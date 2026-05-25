@@ -29,22 +29,22 @@ update_arl() {
     old=$(apiCall "GET" "indexer" | jq '.[] | select(.name=="Deemix")')
     if [ -z "$old" ]; then
         value=$(jq -c '.fields[1].value='"$arl"'' /etc/services.d/setup/POST_indexer.json)
-        apiCallSilent "POST" "indexer" "$value"
+        apiCallSilent "POST" "indexer?forceSave=true" "$value"
     else
         id=$(echo "$old" | jq '.id')
         value=$(echo "$old" | jq -c '.fields[1].value='"$arl"'')
-        apiCallSilent "PUT" "indexer/$id" "$value"
+        apiCallSilent "PUT" "indexer/$id?forceSave=true" "$value"
     fi
 
     echo "[autoconfig] Updating download client"
     old=$(apiCall "GET" "downloadclient" | jq '.[] | select(.name=="Deemix")')
     if [ -z "$old" ]; then
         value=$(jq -c '.fields[4].value='"$arl"'' /etc/services.d/setup/POST_downloadclient.json)
-        apiCallSilent "POST" "downloadclient" "$value"
+        apiCallSilent "POST" "downloadclient?forceSave=true" "$value"
     else
         id=$(echo "$old" | jq '.id')
         value=$(echo "$old" | jq -c '.fields[4].value='"$arl"'')
-        apiCallSilent "PUT" "downloadclient/$id" "$value"
+        apiCallSilent "PUT" "downloadclient/$id?forceSave=true" "$value"
     fi
 }
 
@@ -155,6 +155,11 @@ while [ "$(echo "$arl" | wc --chars)" != "195" ]; do
     arl=$(jq '.arl' "$loginPath")
 done
 
+echo "[autoconfig] Waiting for Deemix to be ready on port 6595..."
+while ! nc -z localhost 6595; do
+    sleep 1
+done
+
 update_arl "$arl"
 
 echo "[autoconfig] Configuration is up to date"
@@ -198,6 +203,9 @@ while true; do
     if inotifywait -e modify "$loginPath"; then
         arl=$(jq '.arl' "$loginPath")
         if [ "$(echo "$arl" | wc --chars)" == "195" ]; then
+            while ! nc -z localhost 6595; do
+                sleep 1
+            done
             update_arl "$arl"
         fi
     fi

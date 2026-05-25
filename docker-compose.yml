@@ -1,6 +1,6 @@
 services:
   lidarr-onsteroids:
-    image: youegraillot/lidarr-on-steroids
+    image: solidshop/lidarr-on-steroids
     build:
       context: .
     environment:
