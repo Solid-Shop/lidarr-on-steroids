@@ -13,7 +13,7 @@ RUN pnpm turbo build --filter=deemix-webui...
 
 FROM ghcr.io/hotio/lidarr:nightly-804c007
 
-LABEL maintainer="youegraillot"
+LABEL maintainer="solidshop"
 
 ENV DEEMIX_SINGLE_USER=true
 ENV AUTOCONFIG=true
