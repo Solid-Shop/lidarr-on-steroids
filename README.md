@@ -46,7 +46,7 @@ docker run \
   -v <path>:/downloads \
   -v <path>:/music \
   --restart unless-stopped \
- youegraillot/lidarr-on-steroids
+ solidshop/lidarr-on-steroids
 ```
 
 ### Docker Compose
