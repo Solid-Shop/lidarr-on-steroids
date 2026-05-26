@@ -17,18 +17,6 @@ jobs:
         with:
           submodules: true
 
-      # https://github.com/marketplace/actions/get-latest-tag
-      - name: Get latest tag
-        id: latest-tag
-        uses: WyriHaximus/github-action-get-previous-tag@v1
-
-      # https://github.com/booxmedialtd/ws-action-parse-semver
-      - name: Parse version
-        id: semver-version
-        uses: booxmedialtd/ws-action-parse-semver@v1
-        with:
-          input_string: ${{ steps.latest-tag.outputs.tag }}
-
       # https://github.com/docker/setup-qemu-action#usage
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
