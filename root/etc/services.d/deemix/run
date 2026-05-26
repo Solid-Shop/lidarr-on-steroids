@@ -31,4 +31,4 @@ chown -R "$PUID:$PGID" /config_deemix
 
 echo "[services.d] Starting Deemix"
 export NODE_ENV=production
-s6-setuidgid "$PUID:$PGID" node /deemix-app/packages/webui/dist/main.js
+s6-setuidgid "$PUID:$PGID" node --unhandled-rejections=warn /deemix-app/packages/webui/dist/main.js
