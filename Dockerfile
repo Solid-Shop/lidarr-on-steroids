@@ -8,6 +8,11 @@ RUN git clone https://github.com/bambanah/deemix.git /app && \
 
 WORKDIR /app
 RUN pnpm install --frozen-lockfile
+
+# Prevent crash when a Deezer channel returns unavailable tracks
+RUN sed -i 's/=> channelNewReleases(dz, c)/=> channelNewReleases(dz, c).catch(() => [])/g' \
+    /app/packages/webui/src/server/routes/api/get/newReleases.ts
+
 RUN pnpm turbo build --filter=deemix-webui...
 
 
