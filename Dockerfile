@@ -38,7 +38,7 @@ RUN apk add --no-cache ffmpeg && \
 COPY lidarr-flac2mp3/root/usr /usr
 
 # deemix
-RUN apk add --no-cache nodejs
+RUN apk add --no-cache bash nodejs
 COPY --from=deemix /app /deemix-app
 VOLUME ["/config_deemix", "/downloads"]
 EXPOSE 6595
