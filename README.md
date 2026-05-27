@@ -72,7 +72,7 @@ Deemix comes with optimal settings allowing Lidarr integration, in particular re
 
 The `setup` service will install the Deemix plugin. This requires Lidarr to be restarted once.
 
-In `AUTOCONFIG` mode (default), the only manual manipulation you'll only have to fill your Deezer credentials in Deemix web UI (port [6595](http://localhost:6595) by default). Once the `/config_deemix/login.json` is filled with the resulting ARL, the `setup` will be able to create the following :
+In `AUTOCONFIG` mode (default), the only manual manipulation you'll only have to fill your Deezer credentials in Deemix web UI (port [6595](http://localhost:6595) by default). The email/password login is supported via a headless-Chromium ARL harvester baked into the image (no need to paste an ARL token). Once the `/config_deemix/login.json` is filled with the resulting ARL, the `setup` will be able to create the following :
   - /music root folder if no other root folder is configured
   - Delay profile allowing Deemix to be used by automatic search
   - Deemix as an indexer
