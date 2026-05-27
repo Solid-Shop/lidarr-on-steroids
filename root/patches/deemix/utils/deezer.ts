@@ -107,9 +107,9 @@ async function harvestArl(email: string, password: string): Promise<string> {
 			timezoneId: "America/New_York",
 			viewport: { width: 1280, height: 800 },
 		});
-		await ctx.addInitScript(() => {
-			Object.defineProperty(navigator, "webdriver", { get: () => undefined });
-		});
+		await ctx.addInitScript(
+			`Object.defineProperty(navigator, 'webdriver', { get: () => undefined });`
+		);
 		page = await ctx.newPage();
 
 		console.log("[deemix-login] navigating to deezer.com/login");
