@@ -156,7 +156,7 @@ while [ "$(echo "$arl" | wc --chars)" != "195" ]; do
 done
 
 echo "[autoconfig] Waiting for Deemix to be ready on port 6595..."
-while ! nc -z localhost 6595; do
+while ! curl -sf http://localhost:6595/api/getSettings > /dev/null; do
     sleep 1
 done
 
@@ -203,7 +203,7 @@ while true; do
     if inotifywait -e modify "$loginPath"; then
         arl=$(jq '.arl' "$loginPath")
         if [ "$(echo "$arl" | wc --chars)" == "195" ]; then
-            while ! nc -z localhost 6595; do
+            while ! curl -sf http://localhost:6595/api/getSettings > /dev/null; do
                 sleep 1
             done
             update_arl "$arl"
