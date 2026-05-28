@@ -81,7 +81,7 @@ Steps to get ARL token:
 2. Open "Developer Tools" (usually ctrl+shift+I or F12) in your browser
 3. For Chromium Browsers: Go to Storage Tab > Cookies (Other browsers you may need to search for this)
 4. Find ARL and copy the value:
-![ARL_Token](https://github.com/solid-shop/lidarr-on-steroids/raw/main/.assets/ARL_Token.png)
+!["ARL_Token"](https://github.com/solid-shop/lidarr-on-steroids/raw/main/.assets/ARL_Token.png "ARL_Token")
 5. Open new tab to Deemix page (http://<ip_address:6595>)
 6. Open settings tab > Use ARL instead > Paste ARL and Force Update/Save
 
