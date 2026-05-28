@@ -32,7 +32,7 @@ RUN apk add --no-cache ffmpeg && \
 COPY lidarr-flac2mp3/root/usr /usr
 
 # deemix
-RUN apk add --no-cache nodejs
+RUN apk add --no-cache bash nodejs
 COPY --from=deemix /app /deemix-app
 VOLUME ["/config_deemix", "/downloads"]
 EXPOSE 6595
@@ -42,7 +42,9 @@ RUN apk add --no-cache inotify-tools && \
     rm -rf /var/lib/apt/lists/*
 
 COPY root /
-RUN chmod +x /etc/services.d/*/run && \
+RUN find /etc/services.d -name run -exec sed -i 's/\r$//' {} + && \
+    find /usr/local/bin -name '*.sh' -exec sed -i 's/\r$//' {} + && \
+    chmod +x /etc/services.d/*/run && \
     chmod +x /usr/local/bin/*.sh
 
 VOLUME ["/config", "/music"]
