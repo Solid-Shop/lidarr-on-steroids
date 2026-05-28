@@ -13,12 +13,6 @@ RUN pnpm install --frozen-lockfile
 RUN sed -i 's/=> channelNewReleases(dz, c)/=> channelNewReleases(dz, c).catch(() => [])/g' \
     /app/packages/webui/src/server/routes/api/get/newReleases.ts
 
-# Replace upstream Deezer email/password auth (silently broken) with a
-# headless-Chromium ARL harvest. Adds visible error logging on failure.
-COPY root/patches/deemix/utils/deezer.ts /app/packages/deemix/src/utils/deezer.ts
-COPY root/patches/deemix/loginEmail.ts /app/packages/webui/src/server/routes/api/post/loginEmail.ts
-RUN pnpm add playwright-core --filter=deemix
-
 RUN pnpm turbo build --filter=deemix-webui...
 
 
@@ -42,11 +36,6 @@ RUN apk add --no-cache bash nodejs
 COPY --from=deemix /app /deemix-app
 VOLUME ["/config_deemix", "/downloads"]
 EXPOSE 6595
-
-# Chromium for Playwright-based Deezer email/password login
-RUN apk add --no-cache chromium nss freetype harfbuzz ttf-freefont ca-certificates
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # arl-watch
 RUN apk add --no-cache inotify-tools && \
