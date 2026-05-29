@@ -74,9 +74,22 @@ services:
 
 Deemix comes with optimal settings allowing Lidarr integration, in particular regarding the folder structure ("createCDFolder" is required for this to work). `DEEMIX_SINGLE_USER` environment variable is also set to `true` to allow the `setup` script to read the corresponding ARL.
 
-The `setup` service will install the Deemix plugin. This requires Lidarr to be restarted once.
+The `setup` service will install the Deemix plugin. ~~This requires Lidarr to be restarted once.~~ Lidarr service will automatically restart once on plugin install.
 
-In `AUTOCONFIG` mode (default), the only manual manipulation you'll only have to fill your Deezer credentials in Deemix web UI (port [6595](http://localhost:6595) by default). Once the `/config_deemix/login.json` is filled with the resulting ARL, the `setup` will be able to create the following :
+In `AUTOCONFIG` mode (default), the only manual manipulation you'll only have to fill your Deezer credentials in Deemix web UI (port [6595](http://localhost:6595) by default). 
+
+Use the **ARL tab** and paste your `arl` cookie value from a logged-in deezer.com browser session — Deezer's email/password auth is currently behind Akamai bot protection and is not usable from a server-side flow. 
+
+Steps to get ARL token:
+1. Login to Deezer.com
+2. Open "Developer Tools" (usually ctrl+shift+I or F12) in your browser
+3. For Chromium Browsers: Go to Storage Tab > Cookies (Other browsers you may need to search for this)
+4. Find ARL and copy the value:
+!["ARL_Token"](https://github.com/solid-shop/lidarr-on-steroids/raw/main/.assets/ARL_Token.png "ARL_Token")
+5. Open new tab to Deemix page (http://<ip_address:6595>)
+6. Open settings tab > Use ARL instead > Paste ARL and Force Update/Save
+
+Once the `/config_deemix/login.json` is filled with the resulting ARL, the `setup` will be able to create the following :
   - /music root folder if no other root folder is configured
   - Delay profile allowing Deemix to be used by automatic search
   - Deemix as an indexer

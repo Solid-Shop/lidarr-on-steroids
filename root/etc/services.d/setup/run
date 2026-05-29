@@ -176,15 +176,32 @@ if [ -z "$plugin" ] || [ "$(echo "$plugin" | jq .updateAvailable)" = "true" ]; t
         sleep $deltaGithubResetTime
     fi
     echo "[autoconfig] Installing / Updating Deemix plugin"
-    apiCallSilent "POST" "command" '{"name":"InstallPlugin","githubUrl":"'$urlPlugin'"}'
+    commandId=$(apiCall "POST" "command" '{"name":"InstallPlugin","githubUrl":"'$urlPlugin'"}' | jq -r '.id')
 
-    while [ -z "$plugin" ] || [ "$(echo "$plugin" | jq .updateAvailable)" = "true" ]; do
+    status=""
+    while [ "$status" != "completed" ] && [ "$status" != "failed" ]; do
         echo "[autoconfig] Waiting plugin installation..."
         sleep 1
-        plugin=$(apiCall "GET" "system/plugins" | jq '.[]|select(.name=="Deemix")')
+        status=$(apiCall "GET" "command/$commandId" | jq -r '.status')
     done
-    echo "[autoconfig] Stopping"
-    /run/s6/basedir/bin/halt
+
+    if [ "$status" = "failed" ]; then
+        echo "[autoconfig] Plugin installation failed, aborting"
+        exit 1
+    fi
+
+    echo "[autoconfig] Restarting Lidarr to finalize plugin installation"
+    s6-svc -r /run/service/service-lidarr
+
+    echo "[autoconfig] Waiting for Lidarr to go down..."
+    while curl -sf "$url/api/v1/system/status" -H "X-Api-Key: $apiKey" > /dev/null; do
+        sleep 1
+    done
+
+    echo "[autoconfig] Waiting for Lidarr to come back on 8686..."
+    while ! curl -sf "$url/api/v1/system/status" -H "X-Api-Key: $apiKey" > /dev/null; do
+        sleep 1
+    done
 fi
 
 if ! isPresent "path" "rootFolder"; then
