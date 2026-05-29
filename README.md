@@ -82,7 +82,7 @@ Steps to get ARL token:
 3. For Chromium Browsers: Go to Storage Tab > Cookies (Other browsers you may need to search for this)
 4. Find ARL and copy the value:
 !["ARL_Token"](https://github.com/solid-shop/lidarr-on-steroids/raw/main/.assets/ARL_Token.png "ARL_Token")
-5. Open new tab to Deemix page (http://<ip_address:6595>)
+5. Open new tab to Deemix page (http://ip_address:6595)
 6. Open settings tab > Use ARL instead > Paste ARL and Force Update/Save
 
 Once the `/config_deemix/login.json` is filled with the resulting ARL, the `setup` will be able to create the following :
