@@ -11,6 +11,7 @@ This repository bundles a modded version of Lidarr and Deemix into a docker imag
   - Automatic Lidarr and Deemix configuration
   - Automatic conversion from any format with ffmpeg
   - Podman compatibility with rootless mode
+  - **Cherry-pick individual tracks** from any album via an injected button in the Lidarr UI (see below)
 
 This allows an easy deployment, with the advantage of having a direct control over Deemix indexing and downloader capacities into Lidarr :
 
@@ -24,6 +25,7 @@ This allows an easy deployment, with the advantage of having a direct control ov
 | :----: | --- |
 | `-p 8686` | Lidarr WebUI |
 | `-p 6595` | Deemix WebUI |
+| `-p 7171` | Track-picker sidecar (must be reachable from the browser that opens Lidarr) |
 | `-e PUID=1000` | for UserID |
 | `-e PGID=1000` | for GroupID |
 | `-e AUTOCONFIG=true` | Enable automatic configuration - see below for explanation |
@@ -41,6 +43,7 @@ docker run \
   --name lidarr \
   -p 8686:8686 \
   -p 6595:6595 \
+  -p 7171:7171 \
   -v <path>:/config \
   -v <path>:/config_deemix \
   -v <path>:/downloads \
@@ -59,6 +62,7 @@ services:
     ports:
       - "8686:8686" # Lidarr web UI
       - "6595:6595" # Deemix web UI
+      - "7171:7171" # Track-picker sidecar
     volumes:
       - <path>:/config
       - <path>:/config_deemix
@@ -81,6 +85,18 @@ In `AUTOCONFIG` mode (default), the only manual manipulation you'll only have to
   - clean-downloads script connection to keep your downloads folder *clean* after each imports
 
 In case you don't want the automagical part (which is really the only value of this image), just set `AUTOCONFIG` environment variable to `false`.
+
+## Cherry-pick tracks from an album
+
+Lidarr only searches at album granularity, but Deemix can download individual tracks. This image ships a small sidecar service plus a script that gets injected into Lidarr's web UI to make track-level downloads available without leaving Lidarr.
+
+How it works:
+- A "Pick Tracks" button appears in the bottom-right of every Lidarr page (look for the cyan pill).
+- Click it to open a search panel; if you're on an album page, the search is pre-filled from the page title.
+- Pick the matching Deezer album, tick the tracks you want, and hit Download.
+- The selection is queued via Deemix, downloaded to `/downloads`, and imported into the matching album folder under `/music` by Lidarr's normal Completed Download Handling. The un-picked tracks on the album simply stay "missing" — unmonitor them in Lidarr if you want the album to register as complete.
+
+The sidecar runs on port `7171` and must be reachable from the browser that opens Lidarr (publish it just like the Lidarr port). It reuses the ARL stored in `/config_deemix/login.json`, so no additional configuration is required.
 
 ## Audio files conversion
 

@@ -1,0 +1,170 @@
+.tp-launch-btn {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 9998;
+    background: #00ccff;
+    color: #1a1a1a;
+    border: 0;
+    border-radius: 999px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    letter-spacing: 0.02em;
+}
+.tp-launch-btn:hover { background: #21d8ff; }
+
+.tp-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.tp-modal {
+    background: #1f2122;
+    color: #e1e1e1;
+    width: min(720px, 92vw);
+    max-height: 86vh;
+    border-radius: 6px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    font-family: 'Roboto', 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden;
+}
+
+.tp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid #2d2f30;
+    background: #262829;
+}
+.tp-title { font-size: 16px; font-weight: 600; }
+.tp-close {
+    background: transparent;
+    border: 0;
+    color: #999;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+.tp-close:hover { color: #fff; }
+
+.tp-search {
+    display: flex;
+    gap: 8px;
+    padding: 12px 18px;
+    border-bottom: 1px solid #2d2f30;
+}
+.tp-search input {
+    flex: 1 1 auto;
+    background: #2a2c2d;
+    color: #e1e1e1;
+    border: 1px solid #3a3c3d;
+    border-radius: 4px;
+    padding: 7px 10px;
+    font-size: 13px;
+    min-width: 0;
+}
+.tp-search input:focus { outline: none; border-color: #00ccff; }
+
+.tp-btn {
+    background: #3a3c3d;
+    color: #e1e1e1;
+    border: 0;
+    border-radius: 4px;
+    padding: 7px 14px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.tp-btn:hover { background: #4a4c4d; }
+.tp-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.tp-btn-primary { background: #00ccff; color: #1a1a1a; font-weight: 600; }
+.tp-btn-primary:hover { background: #21d8ff; }
+
+.tp-results {
+    padding: 8px 18px;
+    overflow-y: auto;
+    max-height: 220px;
+    border-bottom: 1px solid #2d2f30;
+}
+.tp-result {
+    display: flex;
+    gap: 12px;
+    padding: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    align-items: center;
+}
+.tp-result:hover { background: #2a2c2d; }
+.tp-result.tp-selected { background: #003544; }
+.tp-result img,
+.tp-cover-placeholder {
+    width: 48px;
+    height: 48px;
+    border-radius: 3px;
+    background: #333;
+    object-fit: cover;
+    flex: 0 0 48px;
+}
+.tp-result-meta { flex: 1 1 auto; min-width: 0; }
+.tp-result-title {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.tp-result-sub { font-size: 12px; color: #999; }
+
+.tp-tracklist {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 4px 18px;
+}
+.tp-tracklist-head {
+    padding: 8px 4px;
+    border-bottom: 1px solid #2d2f30;
+    font-size: 13px;
+    color: #bbb;
+    position: sticky;
+    top: 0;
+    background: #1f2122;
+}
+.tp-tracklist-head label { cursor: pointer; user-select: none; }
+.tp-track {
+    display: grid;
+    grid-template-columns: 24px 32px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 4px;
+    border-bottom: 1px solid #2a2c2d;
+    cursor: pointer;
+    font-size: 13px;
+}
+.tp-track:hover { background: #262829; }
+.tp-track-num { color: #888; text-align: right; }
+.tp-track-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tp-track-dur { color: #888; font-variant-numeric: tabular-nums; }
+
+.tp-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 18px;
+    border-top: 1px solid #2d2f30;
+    background: #262829;
+}
+.tp-status { font-size: 12px; color: #aaa; flex: 1 1 auto; min-width: 0; }
+.tp-status-error { color: #ff7070; }
+
+.tp-loading { padding: 14px; color: #888; font-size: 13px; text-align: center; }

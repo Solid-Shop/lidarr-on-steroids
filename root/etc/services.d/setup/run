@@ -92,6 +92,57 @@ if [ "$(stat -c '%g' /downloads)" != "$PGUID" ]; then
     chown "$PUID:$PGID" /downloads
 fi
 
+# Inject the track-picker UI into Lidarr's served index.html.
+# Idempotent: re-running only re-injects if the marker is absent (e.g. after a base-image upgrade).
+inject_track_picker_ui() {
+    local pickerSrc="/app/track-picker/static"
+    local marker="<!-- track-picker-inject -->"
+
+    if [ ! -d "$pickerSrc" ]; then
+        echo "[track-picker] Static assets missing at $pickerSrc; skipping injection"
+        return
+    fi
+
+    local indexHtml=""
+    if [ -f /config/.track-picker-ui-path ] && [ -f "$(cat /config/.track-picker-ui-path)" ]; then
+        indexHtml="$(cat /config/.track-picker-ui-path)"
+    else
+        indexHtml="$(find /app -maxdepth 6 -type f -name 'index.html' -path '*/UI/*' 2>/dev/null | head -n 1)"
+        if [ -z "$indexHtml" ]; then
+            indexHtml="$(find /app -maxdepth 6 -type f -name 'index.html' -path '*/Lidarr/*' 2>/dev/null | head -n 1)"
+        fi
+        if [ -n "$indexHtml" ]; then
+            echo "$indexHtml" > /config/.track-picker-ui-path
+        fi
+    fi
+
+    if [ -z "$indexHtml" ]; then
+        echo "[track-picker] Could not locate Lidarr index.html; skipping injection"
+        return
+    fi
+    echo "[track-picker] Using Lidarr UI at $indexHtml"
+
+    local uiDir
+    uiDir="$(dirname "$indexHtml")"
+    mkdir -p "$uiDir/picker"
+    cp -f "$pickerSrc/inject.js"  "$uiDir/picker/inject.js"
+    cp -f "$pickerSrc/picker.css" "$uiDir/picker/picker.css"
+
+    if grep -q "track-picker-inject" "$indexHtml"; then
+        echo "[track-picker] Injection marker already present"
+    else
+        local snippet="    $marker\n    <link rel=\"stylesheet\" href=\"/picker/picker.css\">\n    <script src=\"/picker/inject.js\" defer></script>"
+        if grep -q '</body>' "$indexHtml"; then
+            sed -i "s|</body>|${snippet}\n  </body>|" "$indexHtml"
+        else
+            printf '\n%b\n' "$snippet" >> "$indexHtml"
+        fi
+        echo "[track-picker] Injected script tag into $indexHtml"
+    fi
+}
+
+inject_track_picker_ui
+
 if [ "$AUTOCONFIG" != "true" ]; then
     exit
 fi

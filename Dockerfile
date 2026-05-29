@@ -42,8 +42,11 @@ RUN apk add --no-cache inotify-tools && \
     rm -rf /var/lib/apt/lists/*
 
 COPY root /
-RUN chmod +x /etc/services.d/*/run && \
+RUN find /etc/services.d -type f -name run -exec sed -i 's/\r$//' {} + && \
+    find /usr/local/bin -type f -name '*.sh' -exec sed -i 's/\r$//' {} + && \
+    find /app/track-picker -type f \( -name '*.js' -o -name '*.css' \) -exec sed -i 's/\r$//' {} + 2>/dev/null || true; \
+    chmod +x /etc/services.d/*/run && \
     chmod +x /usr/local/bin/*.sh
 
 VOLUME ["/config", "/music"]
-EXPOSE 6595 8686
+EXPOSE 6595 7171 8686
