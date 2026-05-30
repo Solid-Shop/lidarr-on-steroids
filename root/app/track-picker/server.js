@@ -5,6 +5,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const { exec } = require('child_process');
 
 const PORT = parseInt(process.env.TRACK_PICKER_PORT || '7171', 10);
 const DEEMIX_HOST = process.env.DEEMIX_HOST_INTERNAL || 'localhost';
@@ -141,7 +142,18 @@ function lidarrRequest(method, pathname, { query, body } = {}) {
     });
 }
 
-const IMPORT_MODE = process.env.TRACK_PICKER_IMPORT_MODE || 'Copy';
+const IMPORT_MODE = process.env.TRACK_PICKER_IMPORT_MODE || 'Move';
+
+function cleanEmptyDownloadDirs() {
+    return new Promise((resolve) => {
+        const cmd = "find '" + DOWNLOADS_DIR.replace(/'/g, "'\\''") + "' -mindepth 1 -type d -empty -delete";
+        exec(cmd, (err, stdout, stderr) => {
+            if (err) log('clean empty dirs err:', err.message);
+            else log('Swept empty subfolders under', DOWNLOADS_DIR);
+            resolve();
+        });
+    });
+}
 
 async function waitForLidarrCommand(id, timeoutMs) {
     timeoutMs = timeoutMs || 60000;
@@ -248,28 +260,48 @@ async function isDeemixActivelyDownloading() {
     return false;
 }
 
+async function clearDeemixFinishedDownloads() {
+    // Deemix's webui keeps completed entries in its in-memory queue indefinitely. Clear
+    // them so (a) Deemix's own UI is clean and (b) Lidarr's next download-client poll
+    // doesn't repopulate its queue with the same already-imported entries.
+    try {
+        // Try POST first (most builds), fall back to GET if the endpoint is GET-only here.
+        let r = await deemixCall('POST', '/removeFinishedDownloads', { body: {} });
+        if (r.status === 404 || r.status === 405) {
+            r = await deemixCall('GET', '/removeFinishedDownloads');
+        }
+        if (r.status >= 200 && r.status < 300) log('Cleared finished downloads in Deemix');
+        else log('Deemix removeFinishedDownloads:', r.status, r.text && r.text.slice(0, 200));
+    } catch (err) {
+        log('Deemix cleanup err:', err.message);
+    }
+}
+
 async function clearOrphanedLidarrQueueEntries() {
-    // After our manual-import succeeds, any Deemix queue entries Lidarr is still tracking
-    // (and warning about) are orphans — they have no history grab. Remove them so the
+    // After our manual-import succeeds (and Deemix's finished list has been cleared) any
+    // Deemix queue entries Lidarr is still tracking are orphans. Remove them so the
     // "wasn't grabbed by Lidarr" warning doesn't keep recurring on every poll.
     try {
         const q = await lidarrRequest('GET', '/queue', { query: { pageSize: '200', includeUnknownArtistItems: 'true' } });
         if (q.status !== 200 || !q.json || !Array.isArray(q.json.records)) return 0;
-        const orphans = q.json.records.filter((r) =>
-            (r.downloadClient === 'Deemix' || r.protocol === 'DeemixDownloadProtocol') &&
-            (r.status === 'completed' || r.status === 'warning' || r.trackedDownloadState === 'importBlocked' || r.trackedDownloadStatus === 'warning')
+        const deemixRecords = q.json.records.filter((r) =>
+            r.downloadClient === 'Deemix' || r.protocol === 'DeemixDownloadProtocol'
         );
+        if (!deemixRecords.length) return 0;
+        log('Lidarr queue has', deemixRecords.length, 'Deemix entr' + (deemixRecords.length === 1 ? 'y' : 'ies'),
+            '— states:', deemixRecords.map((r) => (r.status || '?') + '/' + (r.trackedDownloadState || '?') + '/' + (r.trackedDownloadStatus || '?')).join(', '));
+        // After successful import the file is in /music — any remaining Deemix queue
+        // entry is stale. Don't filter on status; clear them all. removeFromClient is
+        // still false so Deemix is never told to delete files.
         let cleared = 0;
-        for (const item of orphans) {
-            // CRITICAL: removeFromClient must be false. true causes Lidarr to ask Deemix to
-            // delete its queue entry, which also deletes the file on disk — eating the file
-            // we just downloaded.
+        for (const item of deemixRecords) {
             const del = await lidarrRequest('DELETE', '/queue/' + item.id, {
                 query: { removeFromClient: 'false', blocklist: 'false', skipRedownload: 'true' },
             });
             if (del.status >= 200 && del.status < 300) cleared++;
+            else log('Failed to delete queue id', item.id, ':', del.status, del.text && del.text.slice(0, 200));
         }
-        if (cleared) log('Cleared', cleared, 'orphan Deemix entries from Lidarr queue');
+        if (cleared) log('Cleared', cleared, 'Deemix entries from Lidarr queue');
         return cleared;
     } catch (err) {
         log('queue cleanup err:', err.message);
@@ -296,8 +328,12 @@ function schedulePicksImport() {
             if (active === null) return;
             if (active === false) {
                 log('Deemix idle; running Lidarr manual import');
-                await triggerLidarrManualImport();
-                await clearOrphanedLidarrQueueEntries();
+                const result = await triggerLidarrManualImport();
+                if (result && result.ok && result.imported) {
+                    await clearDeemixFinishedDownloads();
+                    await clearOrphanedLidarrQueueEntries();
+                    await cleanEmptyDownloadDirs();
+                }
                 importNeeded = false;
                 stopPoller();
             }
@@ -408,6 +444,30 @@ const handlers = {
         sendJson(res, 200, { results: out, total: r.json.total || albums.length });
     },
 
+    'GET /api/search-track': async (req, res, query) => {
+        const term = (query.q || '').trim();
+        const artist = (query.artist || '').trim();
+        if (!term) return sendJson(res, 400, { error: 'missing q' });
+        const r = await deemixCall('GET', '/search', { query: { term, type: 'track', start: '0', nb: '30' } });
+        if (r.status !== 200 || !r.json) return sendJson(res, 502, { error: 'deemix search failed', detail: r.text });
+        const tracks = Array.isArray(r.json.data) ? r.json.data : [];
+        const filtered = artist
+            ? tracks.filter((t) => t.artist && t.artist.name && t.artist.name.toLowerCase().includes(artist.toLowerCase()))
+            : tracks;
+        const out = (filtered.length ? filtered : tracks).slice(0, 25).map((t) => ({
+            id: t.id,
+            title: t.title,
+            artist: t.artist && t.artist.name,
+            album: t.album && t.album.title,
+            albumId: t.album && t.album.id,
+            cover: (t.album && (t.album.cover_medium || t.album.cover)) || null,
+            duration: t.duration,
+            explicit: !!t.explicit_lyrics,
+            rank: t.rank,
+        }));
+        sendJson(res, 200, { results: out, total: r.json.total || tracks.length });
+    },
+
     'GET /api/tracklist': async (req, res, query) => {
         const id = (query.id || '').trim();
         if (!id) return sendJson(res, 400, { error: 'missing id' });
@@ -430,6 +490,64 @@ const handlers = {
             artist: (r.json.artist && r.json.artist.name) || null,
             cover: r.json.cover_medium || r.json.cover_xl || null,
             tracks,
+        });
+    },
+
+    'POST /api/auto-grab': async (req, res) => {
+        let body;
+        try { body = await readBody(req); }
+        catch (e) { return sendJson(res, 400, { error: 'invalid json' }); }
+        if (!body || typeof body.title !== 'string' || !body.title.trim()) {
+            return sendJson(res, 400, { error: 'title required' });
+        }
+        const title = body.title.trim();
+        const artist = (body.artist || '').trim();
+        const album = (body.album || '').trim();
+        const term = artist ? title + ' ' + artist : title;
+        const s = await deemixCall('GET', '/search', { query: { term, type: 'track', start: '0', nb: '30' } });
+        if (s.status !== 200 || !s.json) return sendJson(res, 502, { error: 'deemix search failed', detail: s.text });
+        const all = Array.isArray(s.json.data) ? s.json.data : [];
+        if (!all.length) return sendJson(res, 404, { error: 'no Deezer results for "' + term + '"' });
+
+        const norm = (x) => (x || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, ' ').trim();
+        const wantTitle = norm(title);
+        const wantArtist = norm(artist);
+        const wantAlbum = norm(album);
+
+        const scored = all.map((t) => {
+            const tT = norm(t.title);
+            const tA = norm(t.artist && t.artist.name);
+            const tAlb = norm(t.album && t.album.title);
+            let score = 0;
+            if (tT === wantTitle) score += 100;
+            else if (tT.startsWith(wantTitle) || wantTitle.startsWith(tT)) score += 60;
+            if (wantArtist && tA && (tA === wantArtist || tA.includes(wantArtist) || wantArtist.includes(tA))) score += 50;
+            if (wantAlbum && tAlb && (tAlb === wantAlbum || tAlb.includes(wantAlbum))) score += 25;
+            if (/karaoke|tribute|cover|instrumental|remix|live\b/.test(tT) && !/karaoke|tribute|cover|instrumental|remix|live\b/.test(wantTitle)) score -= 80;
+            return { t, score };
+        }).sort((a, b) => b.score - a.score);
+
+        const best = scored[0];
+        if (!best || best.score < 60) {
+            return sendJson(res, 404, {
+                error: 'no confident match',
+                topCandidate: best && { title: best.t.title, artist: best.t.artist && best.t.artist.name, album: best.t.album && best.t.album.title, score: best.score },
+            });
+        }
+        const chosen = best.t;
+        const url = 'https://www.deezer.com/track/' + chosen.id;
+        const r = await deemixCall('POST', '/addToQueue', { body: { url } });
+        if (r.status !== 200 || !r.json) return sendJson(res, 502, { error: 'addToQueue failed', status: r.status, detail: r.text });
+        if (r.json.result === false) {
+            const errid = r.json.errid || 'unknown';
+            let hint = '';
+            if (errid === 'NotLoggedIn') hint = 'Deemix is not logged in. Paste your ARL in the Deemix UI and try again.';
+            return sendJson(res, 502, { error: 'Deemix rejected the queue request', errid, hint });
+        }
+        schedulePicksImport();
+        sendJson(res, 200, {
+            ok: true,
+            chosen: { id: chosen.id, title: chosen.title, artist: chosen.artist && chosen.artist.name, album: chosen.album && chosen.album.title, score: best.score },
         });
     },
 
@@ -463,7 +581,12 @@ const handlers = {
 
     'POST /api/import-now': async (req, res) => {
         const result = await triggerLidarrManualImport();
-        const cleared = await clearOrphanedLidarrQueueEntries();
+        let cleared = 0;
+        if (result && result.ok && result.imported) {
+            await clearDeemixFinishedDownloads();
+            cleared = await clearOrphanedLidarrQueueEntries();
+            await cleanEmptyDownloadDirs();
+        }
         sendJson(res, result.ok ? 200 : 502, Object.assign({}, result, { lidarrQueueCleared: cleared }));
     },
 };
