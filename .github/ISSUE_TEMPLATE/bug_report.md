@@ -2,8 +2,8 @@
 name: Bug report
 about: Create a report to help us improve
 title: ''
-labels: ''
-assignees: ''
+labels: bug
+assignees: Solid-Shop
 
 ---
 
@@ -32,7 +32,7 @@ If applicable, add screenshots to help explain your problem.
 version: "3"
 services:
   lidarr:
-    image: youegraillot/lidarr-on-steroids
+    image: solidshop/lidarr-on-steroids
     restart: unless-stopped
     ports:
       - "8686:8686" # Lidarr web UI
