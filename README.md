@@ -11,7 +11,7 @@ This repository bundles a modded version of Lidarr and Deemix into a docker imag
   - Automatic Lidarr and Deemix configuration
   - Automatic conversion from any format with ffmpeg
   - Podman compatibility with rootless mode
-  - **Cherry-pick individual tracks** from any album via an injected button in the Lidarr UI (see below)
+  - **Per-track automatic and interactive search** injected into Lidarr's album page — cherry-pick individual songs without grabbing the whole album (see below)
 
 This allows an easy deployment, with the advantage of having a direct control over Deemix indexing and downloader capacities into Lidarr :
 
@@ -31,6 +31,8 @@ This allows an easy deployment, with the advantage of having a direct control ov
 | `-e AUTOCONFIG=true` | Enable automatic configuration - see below for explanation |
 | `-e FLAC2CUSTOM_ARGS=""` | Sets arguments used when calling flac2custom.sh |
 | `-e CLEAN_DOWNLOADS=true` | Enable cleaning empty folders in /downloads |
+| `-e TRACK_PICKER_IMPORT_MODE=Move` | Lidarr import mode for cherry-picked tracks (`Move` or `Copy`). Default `Move`. |
+| `-e TRACK_PICKER_PORT=7171` | Override the sidecar's listen port (default `7171`). |
 | `-v /config` | Configuration files for Lidarr. |
 | `-v /config_deemix` | Configuration files for Deemix. |
 | `-v /downloads` | Path to your download folder for music. |
@@ -99,18 +101,47 @@ Once the `/config_deemix/login.json` is filled with the resulting ARL, the `setu
 
 In case you don't want the automagical part (which is really the only value of this image), just set `AUTOCONFIG` environment variable to `false`.
 
-## Cherry-pick tracks from an album
+## Per-track search and cherry-pick
 
-Lidarr only searches at album granularity, but Deemix can download individual tracks. This image ships a small sidecar service plus a script that gets injected into Lidarr's web UI to make track-level downloads available without leaving Lidarr.
+Lidarr only searches at album granularity, but Deemix can download individual tracks. Although it is a bit of a Frankensteins Monster, this image ships a small Node sidecar plus a script that gets injected into Lidarr's compiled web UI at container start. The injection adds two icons to every track row on an album page — the same magnifying-glass / person pair Lidarr already uses for per-album search, but scoped to the single track.
 
-How it works:
-- A "Pick Tracks" button appears in the bottom-right of every Lidarr page (look for the cyan pill).
-- Click it to open a search panel; if you're on an album page, the search is pre-filled from the page title.
-- Pick the matching Deezer album, tick the tracks you want, and hit Download.
-- The selection is queued via Deemix and downloaded to `/downloads`. Because Lidarr only auto-imports downloads it grabbed itself, the sidecar polls Deemix's queue and — once it drains — calls Lidarr's **Manual Import API** to scan `/downloads` and push the picked tracks into the matching album folder under `/music`. The un-picked tracks on the album simply stay "missing" — unmonitor them in Lidarr if you want the album to register as complete.
-- If the auto-import doesn't trigger (e.g. another Lidarr-grabbed download was in progress when picks finished), you can force it: `curl -X POST http://localhost:7171/api/import-now`.
+!["Per-track search buttons"](https://github.com/solid-shop/lidarr-on-steroids/raw/main/.assets/track-search-buttons.png "Per-track search buttons")
+*(if you can't see them, hard-reload the album page after a fresh container start)*
 
-The sidecar runs on port `7171` and must be reachable from the browser that opens Lidarr (publish it just like the Lidarr port). It reuses the ARL stored in `/config_deemix/login.json`, so no additional configuration is required.
+### What each icon does
+
+- **🔍 Magnifying glass — automatic search.** Sends the track's title plus the artist/album from the page context to the sidecar, which queries Deezer, scores results (exact title + artist match, with a penalty for `live`/`remix`/`instrumental`/`karaoke`/`cover` unless those words were in the original title), and queues the top candidate via Deemix if it scores high enough. The icon spins while searching, turns green when queued, and a toast confirms the chosen result. If no candidate is confident enough you get a "no confident match" toast and nothing is queued.
+- **👤 Person — interactive search.** Opens a Lidarr-styled modal with the track title pre-filled. Search Deezer, see every candidate with cover/title/artist/album/duration, and hit the green **Grab** button on the one you want. The modal inherits Lidarr's theme variables, so it follows whichever theme (dark/light) you're on.
+- **Floating "Pick Tracks" pill** (bottom-right of every Lidarr page) — global escape hatch when you're not on an album page or want to search free-text.
+
+### The download → import flow
+
+1. Whichever way you trigger it, the sidecar POSTs the chosen Deezer track URL to Deemix's `/api/addToQueue`.
+2. Deemix downloads to `/downloads/<artist>/<artist> - <album>/<track>.<ext>` (same path Lidarr's normal Deemix download client uses).
+3. The sidecar polls Deemix's queue (`current` field + per-item `status`) until nothing is actively downloading.
+4. It then calls Lidarr's **Manual Import API** to scan `/downloads`, overriding the partial-album rejections that Lidarr would otherwise apply (`"Has missing tracks"`, `"Album match is not close enough"`) — same as clicking *Import* on a yellow row in Lidarr's manual import dialog. Default mode is `Move`, set `TRACK_PICKER_IMPORT_MODE=Copy` if you prefer copying.
+5. After the import command completes, the sidecar clears Deemix's finished-downloads list, removes the now-orphan rows from Lidarr's queue (with `removeFromClient=false` so no files are ever asked to be deleted by Deemix), and sweeps any empty subfolders under `/downloads`.
+
+The un-picked tracks on the album stay "missing" in Lidarr — unmonitor them if you want the album to register as complete.
+
+If the auto-import doesn't trigger for some reason, force it:
+```
+curl -X POST http://<host>:7171/api/import-now
+```
+
+### Networking
+
+The sidecar runs on port `7171` and must be reachable **from the browser that opens Lidarr** (the injected JS calls it directly via CORS). Publish it just like the Lidarr port. It talks to Lidarr (`localhost:8686`) using the API key it reads from `/config/config.xml`, and to Deemix (`localhost:6595`) using the ARL stored in `/config_deemix/login.json` — no additional configuration required.
+
+Useful endpoints if you want to script against it:
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/health` | Reports `arlPresent` and `deemixLoggedIn` — handy for diagnosing first-run setup. |
+| `GET` | `/api/search?q=<term>` | Album search via Deezer. |
+| `GET` | `/api/search-track?q=<term>&artist=<name>` | Track search via Deezer. |
+| `POST` | `/api/auto-grab` | Body `{title, artist?, album?}` — score + queue best match. |
+| `POST` | `/api/pick` | Body `{trackIds: [<deezerTrackId>, ...]}` — queue specific Deezer tracks. |
+| `POST` | `/api/import-now` | Force the Lidarr manual-import scan and cleanup pipeline. |
 
 ## Audio files conversion
 
