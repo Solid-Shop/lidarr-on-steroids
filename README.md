@@ -25,8 +25,8 @@ This allows an easy deployment, with the advantage of having a direct control ov
 
 | Parameter | Function |
 | :----: | --- |
-| `-p 8686` | Lidarr WebUI |
-| `-p 6595` | Deemix WebUI (also serves the track-picker API at `/picker-api/*`, reverse-proxied to the loopback-only sidecar) |
+| `-p 8686` | Lidarr WebUI + track-picker API (`/picker-api/*`). A small Caddy reverse proxy inside the container fronts Lidarr on this port
+| `-p 6595` | Deemix WebUI (still useful for direct ARL management). |
 | `-e PUID=1000` | for UserID |
 | `-e PGID=1000` | for GroupID |
 | `-e AUTOCONFIG=true` | Enable automatic configuration - see below for explanation |
@@ -123,6 +123,7 @@ Lidarr only searches at album granularity, but Deemix can download individual tr
 The un-picked tracks on the album stay "missing" in Lidarr — unmonitor them if you want the album to register as complete.
 
 If the auto-import doesn't trigger for some reason, manual import will be required.
+
 
 ## Audio files conversion
 

@@ -12,7 +12,9 @@ SETUP
     AUTOCONFIG=$AUTOCONFIG
 ----------------------------------------------------------------------"
 
-url="http://localhost:8686"
+# Lidarr lives on 8685 internally; Caddy fronts it on the externally published 8686.
+# See root/etc/cont-init.d/01-lidarr-port and root/etc/caddy/Caddyfile.
+url="http://localhost:8685"
 urlPlugin="https://github.com/ta264/Lidarr.Plugin.Deemix"
 loginPath="/config_deemix/login.json"
 
@@ -153,8 +155,8 @@ LIDARR SETUP
     PluginSource=$urlPlugin
 ----------------------------------------------------------------------"
 
-echo "[autoconfig] Waiting Lidarr to launch on 8686..."
-while ! nc -z localhost 8686; do
+echo "[autoconfig] Waiting Lidarr to launch on 8685 (Caddy fronts it on 8686)..."
+while ! nc -z localhost 8685; do
     sleep 1
 done
 
@@ -198,7 +200,7 @@ if [ -z "$plugin" ] || [ "$(echo "$plugin" | jq .updateAvailable)" = "true" ]; t
         sleep 1
     done
 
-    echo "[autoconfig] Waiting for Lidarr to come back on 8686..."
+    echo "[autoconfig] Waiting for Lidarr to come back on 8685..."
     while ! curl -sf "$url/api/v1/system/status" -H "X-Api-Key: $apiKey" > /dev/null; do
         sleep 1
     done

@@ -1,0 +1,55 @@
+#!/usr/bin/with-contenv bash
+# Runs once before Lidarr starts. Ensures Lidarr listens on its internal port (8685)
+# so that Caddy can take the externally-published port (8686) and reverse-proxy
+# /picker-api/* to the loopback track-picker sidecar.
+#
+# Three cases:
+#   1. Fresh install (no config.xml) → pre-create a minimal config with Port=8685.
+#      Lidarr respects existing config.xml and fills in the rest on first boot.
+#   2. Existing install with default port 8686 → flip to 8685 in place.
+#   3. Existing install with a custom port → leave alone, log a warning. The
+#      track-picker feature won't be reachable through Caddy in this case; the
+#      user can either reset Lidarr to 8686 (we'll flip it next boot) or run
+#      without Caddy.
+
+CONFIG=/config/config.xml
+TARGET_PORT=8685
+PUID=${PUID:-1000}
+PGID=${PGID:-1000}
+
+mkdir -p /config
+# Hotio's init-setup only chowns /config (non-recursive). Anything we create here as
+# root would be unreadable to Lidarr (PUID:PGID), so we explicitly fix ownership.
+chown "$PUID:$PGID" /config
+
+if [ ! -f "$CONFIG" ]; then
+    echo "[cont-init] Pre-creating $CONFIG with Lidarr internal port $TARGET_PORT"
+    cat > "$CONFIG" <<EOF
+<Config>
+  <Port>$TARGET_PORT</Port>
+</Config>
+EOF
+    chown "$PUID:$PGID" "$CONFIG"
+    chmod 664 "$CONFIG"
+    exit 0
+fi
+
+currentPort=$(grep -oP '(?<=<Port>)[0-9]+(?=</Port>)' "$CONFIG" | head -n 1)
+
+if [ "$currentPort" = "$TARGET_PORT" ]; then
+    echo "[cont-init] Lidarr already on internal port $TARGET_PORT"
+elif [ "$currentPort" = "8686" ]; then
+    echo "[cont-init] Reconfiguring Lidarr internal port: 8686 -> $TARGET_PORT"
+    sed -i "s|<Port>8686</Port>|<Port>$TARGET_PORT</Port>|" "$CONFIG"
+    # sed -i preserves ownership in-place, so we don't need to chown again here.
+else
+    echo "[cont-init] WARN: Lidarr port is '$currentPort' (expected 8686 or $TARGET_PORT)."
+    echo "[cont-init] WARN: Caddy will fail to reach Lidarr. Reset Lidarr to port 8686 in $CONFIG to use the track-picker."
+fi
+
+# Belt + suspenders: ensure config.xml is readable by Lidarr regardless of how it got
+# created. Covers the case where a previous failed boot left a root-owned file behind.
+if [ -f "$CONFIG" ] && [ "$(stat -c '%u' "$CONFIG")" != "$PUID" ]; then
+    echo "[cont-init] Fixing ownership of $CONFIG (was $(stat -c '%u:%g' "$CONFIG"), setting $PUID:$PGID)"
+    chown "$PUID:$PGID" "$CONFIG"
+fi
