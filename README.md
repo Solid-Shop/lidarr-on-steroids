@@ -1,6 +1,7 @@
 # [lidarr-on-steroids](https://github.com/solid-shop/lidarr-on-steroids/)
 
 ```I got tired of looking for updates on this project, so I started my own forked version```
+
 ```BIG PROPS TO CREATOR: youegraillot```
 
 [![GitHub last commit](https://img.shields.io/github/last-commit/solid-shop/lidarr-on-steroids?style=for-the-badge&logo=github)](https://github.com/solid-shop/lidarr-on-steroids)
