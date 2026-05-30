@@ -1,0 +1,15 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+UMASK_SET=${UMASK_SET:-022}
+umask "$UMASK_SET"
+
+cd /
+
+export TRACK_PICKER_PORT=${TRACK_PICKER_PORT:-7171}
+export DEEMIX_HOST_INTERNAL=${DEEMIX_HOST_INTERNAL:-localhost}
+export DEEMIX_INTERNAL_PORT=${DEEMIX_INTERNAL_PORT:-6595}
+export DEEMIX_LOGIN_PATH=${DEEMIX_LOGIN_PATH:-/config_deemix/login.json}
+
+echo "[services.d] Starting track-picker on port $TRACK_PICKER_PORT"
+exec s6-setuidgid "$PUID:$PGID" node /app/track-picker/server.js
