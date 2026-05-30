@@ -624,8 +624,12 @@ const server = http.createServer(async (req, res) => {
     }
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-    log('listening on', PORT, '(deemix at', DEEMIX_HOST + ':' + DEEMIX_PORT + ')');
+// Bind to loopback only. The sidecar is reached by browsers via Deemix's reverse-proxy
+// route at /picker-api (patched into Deemix at image build time), so this port should
+// never be reachable from outside the container.
+const BIND_ADDR = process.env.TRACK_PICKER_BIND || '127.0.0.1';
+server.listen(PORT, BIND_ADDR, () => {
+    log('listening on', BIND_ADDR + ':' + PORT, '(deemix at', DEEMIX_HOST + ':' + DEEMIX_PORT + ')');
 });
 
 process.on('uncaughtException', (err) => log('uncaught', err));

@@ -3,7 +3,10 @@
     if (window.__trackPickerLoaded) return;
     window.__trackPickerLoaded = true;
 
-    var API_BASE = window.location.protocol + '//' + window.location.hostname + ':7171';
+    // The track-picker sidecar is loopback-only inside the container; the browser reaches
+    // it via a /picker-api reverse-proxy route patched into Deemix's Express app at build
+    // time. Hitting Deemix's already-published port avoids having to expose 7171 to the host.
+    var API_BASE = window.location.protocol + '//' + window.location.hostname + ':6595/picker-api';
 
     var ICON_PATHS = {
         user: 'M224 256c70.7 0 128-57.3 128-128S294.7 0 224 0 96 57.3 96 128s57.3 128 128 128zm89.6 32h-16.7c-22.2 10.2-46.9 16-72.9 16s-50.6-5.8-72.9-16h-16.7C60.2 288 0 348.2 0 422.4V464c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48v-41.6c0-74.2-60.2-134.4-134.4-134.4z',
@@ -145,7 +148,7 @@
         body.innerHTML = '';
         body.appendChild($('div', { className: 'tp-loading' }, 'Searching Deezer…'));
         setStatus('');
-        api('/api/search-track?q=' + encodeURIComponent(q) + (modalState.artist ? '&artist=' + encodeURIComponent(modalState.artist) : ''))
+        api('/search-track?q=' + encodeURIComponent(q) + (modalState.artist ? '&artist=' + encodeURIComponent(modalState.artist) : ''))
             .then(function (r) {
                 body.innerHTML = '';
                 if (r.status !== 200) { setStatus('Search failed: ' + (r.json && r.json.error), true); return; }
@@ -191,7 +194,7 @@
         modalState.busy = true;
         btn.disabled = true;
         setStatus('Queueing "' + t.title + '" via Deemix…');
-        api('/api/pick', { method: 'POST', body: { trackIds: [t.id] } })
+        api('/pick', { method: 'POST', body: { trackIds: [t.id] } })
             .then(function (r) {
                 modalState.busy = false;
                 if (r.status !== 200) {
@@ -249,7 +252,7 @@
         btn.disabled = true;
         btn.classList.add('tp-row-btn-busy');
         var ctx = readPageContext();
-        api('/api/auto-grab', { method: 'POST', body: { title: title, artist: ctx.artist, album: ctx.album } })
+        api('/auto-grab', { method: 'POST', body: { title: title, artist: ctx.artist, album: ctx.album } })
             .then(function (r) {
                 btn.disabled = false;
                 btn.classList.remove('tp-row-btn-busy');
