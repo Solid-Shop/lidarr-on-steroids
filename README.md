@@ -1,6 +1,8 @@
 # [lidarr-on-steroids](https://github.com/solid-shop/lidarr-on-steroids/)
 
-```I got tired of looking for updates on this project, so I started my own forked version```
+```I got tired of looking for updates on this project, so I started my own forked version
+BIG PROPS TO CREATOR: youegraillot
+```
 
 [![GitHub last commit](https://img.shields.io/github/last-commit/solid-shop/lidarr-on-steroids?style=for-the-badge&logo=github)](https://github.com/solid-shop/lidarr-on-steroids)
 [![Latest tag](https://img.shields.io/docker/v/solidshop/lidarr-on-steroids?style=for-the-badge&logo=docker)](https://hub.docker.com/r/solidshop/lidarr-on-steroids)
@@ -99,7 +101,7 @@ Once the `/config_deemix/login.json` is filled with the resulting ARL, the `setu
   - Flac2Custom script connection if `FLAC2CUSTOM_ARGS` is set
   - clean-downloads script connection to keep your downloads folder *clean* after each imports
 
-In case you don't want the automagical part (which is really the only value of this image), just set `AUTOCONFIG` environment variable to `false`.
+In case you don't want the automagical part, just set `AUTOCONFIG` environment variable to `false`.
 
 ## Per-track search and cherry-pick
 
