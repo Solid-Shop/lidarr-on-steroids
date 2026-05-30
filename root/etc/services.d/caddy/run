@@ -1,0 +1,12 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+# Wait for Lidarr to be listening on its internal port before starting Caddy,
+# so the first requests don't 502 while Lidarr is still booting.
+echo "[services.d] caddy: waiting for Lidarr on 127.0.0.1:8685"
+while ! nc -z 127.0.0.1 8685; do
+    sleep 1
+done
+
+echo "[services.d] caddy: starting on :8686 (proxy to Lidarr:8685 + sidecar:7171)"
+exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile

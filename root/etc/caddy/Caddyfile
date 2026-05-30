@@ -1,0 +1,29 @@
+{
+    # We sit behind an external reverse proxy (Nginx Proxy Manager, Caddy, Traefik,
+    # Cloudflare Tunnel, etc.) or are accessed directly over plain HTTP on the LAN.
+    # TLS is the outer proxy's job — don't try to provision certs here.
+    auto_https off
+    admin off
+}
+
+# Single externally-published port. Caddy fans out internally:
+#   /picker-api/*  → loopback track-picker sidecar (rewrites /picker-api/foo → /api/foo)
+#   /*             → Lidarr (which we relocated to internal port 8685 via cont-init)
+:8686 {
+    encode gzip zstd
+
+    handle_path /picker-api/* {
+        rewrite * /api{path}
+        reverse_proxy 127.0.0.1:7171
+    }
+
+    reverse_proxy 127.0.0.1:8685 {
+        # Don't buffer streaming responses (Lidarr's SignalR long-poll fallback,
+        # large file downloads, etc.). WebSocket upgrades are handled transparently.
+        flush_interval -1
+        transport http {
+            read_timeout 30m
+            response_header_timeout 30m
+        }
+    }
+}
