@@ -226,11 +226,12 @@
         api('/api/pick', { method: 'POST', body: { trackIds: ids } })
             .then(function (r) {
                 if (r.status !== 200) {
-                    setStatus('Queue failed: ' + (r.json && (r.json.error || r.json.detail)), true);
+                    var msg = (r.json && (r.json.hint || r.json.error || r.json.detail)) || ('HTTP ' + r.status);
+                    setStatus('Queue failed: ' + msg, true);
                     btn.disabled = false;
                     return;
                 }
-                setStatus('Queued ' + r.json.queued + ' tracks. Lidarr will import them as Deemix finishes downloading.');
+                setStatus('Queued ' + r.json.queued + ' track(s). Lidarr will manually import them once Deemix finishes downloading. Manual import scan will run automatically; if needed, POST /api/import-now to retry.');
                 state.selected = new Set();
                 Array.prototype.forEach.call(document.querySelectorAll('.tp-track input[type=checkbox]'), function (cb) { cb.checked = false; });
                 var toggleAll = document.getElementById('tp-toggle-all');

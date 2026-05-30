@@ -107,7 +107,8 @@ How it works:
 - A "Pick Tracks" button appears in the bottom-right of every Lidarr page (look for the cyan pill).
 - Click it to open a search panel; if you're on an album page, the search is pre-filled from the page title.
 - Pick the matching Deezer album, tick the tracks you want, and hit Download.
-- The selection is queued via Deemix, downloaded to `/downloads`, and imported into the matching album folder under `/music` by Lidarr's normal Completed Download Handling. The un-picked tracks on the album simply stay "missing" — unmonitor them in Lidarr if you want the album to register as complete.
+- The selection is queued via Deemix and downloaded to `/downloads`. Because Lidarr only auto-imports downloads it grabbed itself, the sidecar polls Deemix's queue and — once it drains — calls Lidarr's **Manual Import API** to scan `/downloads` and push the picked tracks into the matching album folder under `/music`. The un-picked tracks on the album simply stay "missing" — unmonitor them in Lidarr if you want the album to register as complete.
+- If the auto-import doesn't trigger (e.g. another Lidarr-grabbed download was in progress when picks finished), you can force it: `curl -X POST http://localhost:7171/api/import-now`.
 
 The sidecar runs on port `7171` and must be reachable from the browser that opens Lidarr (publish it just like the Lidarr port). It reuses the ARL stored in `/config_deemix/login.json`, so no additional configuration is required.
 
