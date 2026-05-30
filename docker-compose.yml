@@ -8,6 +8,7 @@ services:
     ports:
       - "8686:8686" # Lidarr web UI
       - "6595:6595" # Deemix web UI
+      - "7171:7171" # Track-picker sidecar (Lidarr UI calls this from the browser)
     volumes:
       - ./tmp/config:/config
       - ./tmp/config_deemix:/config_deemix

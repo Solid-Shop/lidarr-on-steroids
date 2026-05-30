@@ -1,0 +1,273 @@
+/* Track-picker injection styles.
+   Where possible we inherit Lidarr's theme via its CSS custom properties so the modal
+   matches whichever theme (dark/light) the user has set. Fallback values match the
+   default Lidarr dark theme. */
+
+.tp-row-buttons {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+.tp-row-btn {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 4px 6px;
+    color: var(--iconButtonColor, #adadad);
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+    border-radius: 3px;
+    transition: color 0.15s ease;
+}
+.tp-row-btn:hover { color: var(--iconButtonHoverColor, #00ccff); }
+.tp-row-btn:disabled { opacity: 0.5; cursor: wait; }
+.tp-row-btn-done { color: var(--successColor, #5cb85c) !important; }
+.tp-row-btn svg { display: block; }
+
+.tp-row-btn-busy svg { animation: tp-spin 0.9s linear infinite; }
+@keyframes tp-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.tp-toasts {
+    position: fixed;
+    right: 18px;
+    bottom: 70px;
+    z-index: 9997;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+    max-width: min(420px, calc(100vw - 36px));
+}
+.tp-toast {
+    background: var(--modalBackgroundColor, #2a2c2d);
+    color: var(--textColor, #eee);
+    border: 1px solid var(--borderColor, #3a3c3d);
+    border-left: 4px solid var(--successColor, #5cb85c);
+    padding: 10px 14px;
+    border-radius: 4px;
+    font-size: 13px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: auto;
+}
+.tp-toast-visible { opacity: 1; transform: translateX(0); }
+.tp-toast-error { border-left-color: var(--dangerColor, #ff5c5c); }
+
+.tp-launch-btn {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 9998;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--themeBlue, #00ccff);
+    color: var(--themeDarkColor, #1a1a1a);
+    border: 0;
+    border-radius: 999px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.tp-launch-btn:hover { filter: brightness(1.1); }
+.tp-launch-btn svg { display: block; }
+
+/* ---------- Modal ---------- */
+.tp-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: var(--modalBackdropBackgroundColor, rgba(0, 0, 0, 0.6));
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 9999;
+    padding: 60px 20px 20px;
+    overflow-y: auto;
+}
+
+.tp-modal {
+    background: var(--modalBackgroundColor, #2a2c2d);
+    color: var(--textColor, #ccc);
+    width: min(960px, 100%);
+    border-radius: 4px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    font-family: 'Roboto', 'Segoe UI', system-ui, sans-serif;
+    max-height: calc(100vh - 80px);
+    overflow: hidden;
+    border: 1px solid var(--borderColor, #3a3c3d);
+}
+
+.tp-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--borderColor, #3a3c3d);
+    background: var(--modalHeaderBackgroundColor, var(--modalBackgroundColor, #2a2c2d));
+}
+.tp-modal-title { font-size: 16px; font-weight: 600; color: var(--textColor, #fff); }
+
+.tp-icon-btn {
+    background: transparent;
+    border: 0;
+    color: var(--iconButtonColor, #999);
+    cursor: pointer;
+    padding: 4px;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 3px;
+}
+.tp-icon-btn:hover { color: var(--modalCloseButtonHoverColor, #fff); }
+
+.tp-modal-search {
+    display: flex;
+    gap: 8px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--borderColor, #3a3c3d);
+    background: var(--inputBackgroundColor, transparent);
+}
+.tp-input {
+    flex: 1 1 auto;
+    background: var(--inputBackgroundColor, #1f2122);
+    color: var(--textColor, #ccc);
+    border: 1px solid var(--inputBorderColor, #3a3c3d);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 14px;
+    min-width: 0;
+}
+.tp-input:focus {
+    outline: none;
+    border-color: var(--inputFocusBorderColor, var(--themeBlue, #00ccff));
+}
+
+.tp-btn {
+    background: var(--btnDefaultBgColor, #3a3c3d);
+    color: var(--textColor, #ccc);
+    border: 0;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+}
+.tp-btn:hover { filter: brightness(1.1); }
+.tp-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.tp-btn-primary { background: var(--themeBlue, #00ccff); color: var(--themeDarkColor, #1a1a1a); font-weight: 600; }
+.tp-btn-grab {
+    background: var(--successColor, #5cb85c);
+    color: #fff;
+    padding: 5px 12px;
+    font-size: 12px;
+}
+.tp-btn-grab:hover { background: var(--lidarrGreen, #4cae4c); }
+.tp-btn-grabbed { background: var(--disabledColor, #555) !important; cursor: default !important; opacity: 0.7; }
+
+.tp-modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    background: var(--modalBackgroundColor, #2a2c2d);
+}
+
+/* Results table: grid layout so columns stay aligned */
+.tp-results-head,
+.tp-result-row {
+    display: grid;
+    grid-template-columns: 56px 1fr 1fr 90px 110px;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 20px;
+}
+.tp-results-head {
+    position: sticky;
+    top: 0;
+    background: var(--modalHeaderBackgroundColor, #1f2122);
+    border-bottom: 1px solid var(--borderColor, #3a3c3d);
+    color: var(--helpTextColor, #999);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    z-index: 1;
+}
+.tp-result-row {
+    border-bottom: 1px solid var(--borderColor, #3a3c3d);
+}
+.tp-result-row:hover { background: var(--tableRowHoverBackgroundColor, rgba(255, 255, 255, 0.04)); }
+
+.tp-col-cover {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 3px;
+}
+.tp-cover-placeholder { background: var(--inputBackgroundColor, #333); }
+.tp-col-title { min-width: 0; }
+.tp-result-title {
+    font-size: 14px;
+    color: var(--textColor, #ccc);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.tp-result-sub {
+    font-size: 12px;
+    color: var(--helpTextColor, #888);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.tp-col-album {
+    font-size: 13px;
+    color: var(--dimColor, #aaa);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.tp-col-duration {
+    font-size: 13px;
+    color: var(--dimColor, #aaa);
+    font-variant-numeric: tabular-nums;
+}
+.tp-col-action {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.tp-modal-footer {
+    display: flex;
+    align-items: center;
+    padding: 10px 20px;
+    border-top: 1px solid var(--borderColor, #3a3c3d);
+    background: var(--modalHeaderBackgroundColor, var(--modalBackgroundColor, #2a2c2d));
+    min-height: 38px;
+}
+.tp-status { font-size: 12px; color: var(--helpTextColor, #aaa); flex: 1 1 auto; }
+.tp-status-error { color: var(--dangerColor, #ff7070); }
+
+.tp-loading {
+    padding: 30px;
+    text-align: center;
+    color: var(--helpTextColor, #888);
+    font-size: 13px;
+}
+
+@media (max-width: 700px) {
+    .tp-results-head,
+    .tp-result-row { grid-template-columns: 48px 1fr 80px; }
+    .tp-col-album { display: none; }
+}
