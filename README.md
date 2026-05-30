@@ -145,3 +145,13 @@ This project is just a compilation of various tools made possible by these proje
 - [hotio](https://hotio.dev/) for the base docker image
 
 Alternatively, you could use [Deemixrr](https://github.com/TheUltimateC0der/deemixrr) which pretty much offers the same functionalities without the *starr of the various Sonarr forks.
+
+## License
+
+This project is licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE) for the full text.
+
+It bundles and builds on GPLv3-licensed components (Lidarr, lidarr-flac2mp3, Deemix), so the combined work is distributed under the same terms. Original contributions to this fork (e.g. the per-track picker under `root/app/track-picker/`) are:
+
+> Copyright (c) 2026 Solid-Shop
+
+Copyright and license notices of the bundled upstream projects are retained with their respective sources.
