@@ -13,6 +13,22 @@ RUN pnpm install --frozen-lockfile
 RUN sed -i 's/=> channelNewReleases(dz, c)/=> channelNewReleases(dz, c).catch(() => [])/g' \
     /app/packages/webui/src/server/routes/api/get/newReleases.ts
 
+# Track-picker reverse-proxy: forwards Deemix /picker-api/* → loopback sidecar on 7171,
+# so the sidecar's port never needs to be published on the host.
+COPY root/app/track-picker/deemix-patch/pickerProxy.ts /app/packages/webui/src/server/pickerProxy.ts
+RUN set -eu; \
+    MAIN=/app/packages/webui/src/server/main.ts; \
+    test -f "$MAIN"; \
+    # Insert our import on the line directly after the express import.
+    # .js extension is required because Deemix's tsconfig uses moduleResolution: nodenext.
+    sed -i 's|^\(import express, { type Express } from "express";\)$|\1\nimport { pickerProxy } from "./pickerProxy.js";|' "$MAIN"; \
+    # Mount the proxy just before the API routes are registered.
+    sed -i 's|^\(\s*\)\(registerApis(app);\)|\1app.use("/picker-api", pickerProxy);\n\1\2|' "$MAIN"; \
+    # Fail loudly if either patch didn't take.
+    grep -q '^import { pickerProxy }' "$MAIN" || { echo "pickerProxy import patch failed"; head -20 "$MAIN"; exit 1; }; \
+    grep -q '"/picker-api"' "$MAIN" || { echo "pickerProxy app.use patch failed"; grep -n 'registerApis' "$MAIN"; exit 1; }; \
+    echo "pickerProxy patch applied"
+
 RUN pnpm turbo build --filter=deemix-webui...
 
 
@@ -49,4 +65,4 @@ RUN find /etc/services.d -type f -name run -exec sed -i 's/\r$//' {} + && \
     chmod +x /usr/local/bin/*.sh
 
 VOLUME ["/config", "/music"]
-EXPOSE 6595 7171 8686
+EXPOSE 6595 8686
