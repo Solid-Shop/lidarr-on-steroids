@@ -1,0 +1,60 @@
+name: Smoke test
+
+# Runs in tandem with Docker CI on the version-bump branch. Docker CI proves the image
+# *builds* (multi-arch); this proves a Lidarr/Deemix version bump didn't break the custom
+# integration on top (Caddy proxy, track-picker sidecar, UI injection, Lidarr autoconfig).
+# No real credentials needed — see .github/scripts/smoke-test.sh for the dummy-ARL trick.
+on:
+  push:
+    branches: [lidarr-version-update]
+  workflow_dispatch:
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true # lidarr-flac2mp3 is a submodule
+
+      # Native amd64 build, loaded straight into the runner's Docker daemon so we can run it.
+      # No QEMU/buildx needed; arm64 build correctness stays covered by docker-ci.yml.
+      - name: Build image
+        run: docker build -t lidarr-on-steroids:smoke .
+
+      - name: Start container
+        run: |
+          docker run -d --name los \
+            -p 8686:8686 -p 6595:6595 \
+            -e FLAC2CUSTOM_ARGS='-a "-vn -c:a libopus -b:a 64k" -e .opus -r \.mp3$' \
+            lidarr-on-steroids:smoke
+
+      # Unblock autoconfig: setup/run waits for a 192-char arl in login.json. forceSave=true
+      # means the indexer/download-client save without a real Deezer login, so a dummy works.
+      - name: Inject dummy ARL
+        run: |
+          ARL=$(printf 'a%.0s' $(seq 1 192))
+          for i in $(seq 1 10); do
+            if docker exec los sh -c "printf '{\"arl\":\"$ARL\"}' > /config_deemix/login.json"; then
+              echo "Dummy ARL written."; exit 0
+            fi
+            echo "Container not ready yet ($i)..."; sleep 1
+          done
+          echo "ERROR: could not write dummy ARL into container."; exit 1
+
+      - name: Run smoke assertions
+        run: bash .github/scripts/smoke-test.sh
+
+      - name: Container logs (on failure)
+        if: failure()
+        run: docker logs los 2>&1 || true
+
+      - name: Cleanup
+        if: always()
+        run: docker rm -f los || true
