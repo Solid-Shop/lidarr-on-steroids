@@ -8,18 +8,22 @@
 # Lidarr autoconfig). This script asserts all of that actually works against a running
 # container, so a version bump that breaks the wiring fails CI instead of shipping.
 #
-# It needs NO real credentials. A *dummy* 192-char ARL is enough to unblock the autoconfig
-# (setup/run blocks until /config_deemix/login.json holds a 192-char arl), because the
-# indexer/download-client are saved with forceSave=true, which skips the Deezer connection
-# test. The dummy ARL is injected by the workflow before this script runs; for local runs
-# do it yourself first, e.g.:
+# Credentials: most checks need NONE. A *dummy* 192-char ARL unblocks the autoconfig
+# (setup/run blocks until /config_deemix/login.json holds a 192-char arl), which is enough to
+# verify services, UI injection, plugin install, root folder, delay profile and notifications.
+# BUT the Deemix indexer + download client saves are validated against Deezer even with
+# forceSave=true, so a dummy ARL can NOT create them — checks 8 & 9 need a REAL ARL. They run
+# only when REAL_ARL=1 (the workflow sets that when the DEEZER_ARL secret is present);
+# otherwise they're SKIPPED, not failed. The workflow injects the ARL before this script runs;
+# for local runs do it yourself first, e.g.:
 #
-#   ARL=$(printf 'a%.0s' $(seq 1 192))
+#   ARL=$(printf 'a%.0s' $(seq 1 192))   # or paste your real 192-char ARL and use REAL_ARL=1
 #   docker exec los sh -c "printf '{\"arl\":\"$ARL\"}' > /config_deemix/login.json"
-#   bash .github/scripts/smoke-test.sh
+#   REAL_ARL=0 bash .github/scripts/smoke-test.sh
 #
 # Overridable via env: CONTAINER (default los), LIDARR_URL (http://localhost:8686),
-# DEEMIX_URL (http://localhost:6595), TIMEOUT (seconds to wait for autoconfig, default 480).
+# DEEMIX_URL (http://localhost:6595), TIMEOUT (seconds to wait for autoconfig, default 480),
+# REAL_ARL (0/1 — whether a real ARL was injected, gates checks 8 & 9).
 # Requires: docker, curl, jq (all present on ubuntu-latest runners).
 
 set -u
@@ -28,14 +32,17 @@ CONTAINER="${CONTAINER:-los}"
 LIDARR_URL="${LIDARR_URL:-http://localhost:8686}"
 DEEMIX_URL="${DEEMIX_URL:-http://localhost:6595}"
 TIMEOUT="${TIMEOUT:-480}"
+REAL_ARL="${REAL_ARL:-0}"
 MARKER="AUTOCONFIG COMPLETED"
 
 PASS=0
 FAIL=0
+SKIP=0
 FAILED_LIST=""
 
-green() { printf '\033[32m%s\033[0m' "$1"; }
-red()   { printf '\033[31m%s\033[0m' "$1"; }
+green()  { printf '\033[32m%s\033[0m' "$1"; }
+red()    { printf '\033[31m%s\033[0m' "$1"; }
+yellow() { printf '\033[33m%s\033[0m' "$1"; }
 
 # run <description> <function-name> — runs the check function, records pass/fail.
 run() {
@@ -49,6 +56,13 @@ run() {
         FAILED_LIST="${FAILED_LIST}
     - ${desc}"
     fi
+}
+
+# skip <description> <reason> — records a check that was deliberately not run.
+skip() {
+    local desc="$1" reason="$2"
+    printf '  %s %s (%s)\n' "$(yellow '○ SKIP')" "$desc" "$reason"
+    SKIP=$((SKIP + 1))
 }
 
 container_running() {
@@ -150,8 +164,13 @@ run "4b. UI injection: /picker/picker.css served"             c04b
 run "5.  Deemix plugin installed in Lidarr"                   c05
 run "6.  Root folder /music configured"                       c06
 run "7.  Deemix allowed in default delay profile"             c07
-run "8.  Deemix indexer present (update_arl POST schema)"     c08
-run "9.  Deemix download client present"                      c09
+if [ "$REAL_ARL" = "1" ]; then
+    run "8.  Deemix indexer present (update_arl POST schema)"  c08
+    run "9.  Deemix download client present"                   c09
+else
+    skip "8.  Deemix indexer present"          "needs real DEEZER_ARL secret"
+    skip "9.  Deemix download client present"  "needs real DEEZER_ARL secret"
+fi
 run "10a. 'Clean Downloads' notification configured"          c10a
 run "10b. flac2 notification configured (FLAC2CUSTOM_ARGS)"   c10b
 run "11a. ffmpeg present in image"                            c11a
@@ -161,7 +180,14 @@ run "12. Container still running (no crash loop)"             c12
 
 echo
 echo "----------------------------------------------------------------------"
-printf 'Smoke test: %s passed, %s failed (of %s)\n' "$PASS" "$FAIL" "$((PASS + FAIL))"
+printf 'Smoke test: %s passed, %s failed, %s skipped (of %s)\n' \
+    "$PASS" "$FAIL" "$SKIP" "$((PASS + FAIL + SKIP))"
+if [ "$REAL_ARL" != "1" ]; then
+    echo "Indexer/download-client (8, 9) were SKIPPED — they need a real ARL (set the"
+    echo "DEEZER_ARL repo secret). For reference, here is what the dummy-ARL autoconfig"
+    echo "logged for those saves (a 4xx here is the expected Deezer-auth rejection):"
+    docker logs "$CONTAINER" 2>&1 | grep -iE '\[autoconfig\].*(indexer|download.?client)' | sed 's/^/    /' || true
+fi
 if [ "$FAIL" -ne 0 ]; then
     printf 'Failures:%b\n' "$FAILED_LIST"
     echo "----------------------------------------------------------------------"

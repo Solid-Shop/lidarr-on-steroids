@@ -3,7 +3,9 @@ name: Smoke test
 # Runs in tandem with Docker CI on the version-bump branch. Docker CI proves the image
 # *builds* (multi-arch); this proves a Lidarr/Deemix version bump didn't break the custom
 # integration on top (Caddy proxy, track-picker sidecar, UI injection, Lidarr autoconfig).
-# No real credentials needed — see .github/scripts/smoke-test.sh for the dummy-ARL trick.
+# Most checks need no credentials (a dummy ARL unblocks autoconfig). The Deemix indexer +
+# download-client checks need a real ARL: set the DEEZER_ARL repo secret to enable them,
+# otherwise they're skipped. See .github/scripts/smoke-test.sh for details.
 on:
   push:
     branches: [lidarr-version-update]
@@ -17,6 +19,11 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # Optional. Set this repo secret to a real 192-char Deezer ARL to enable the indexer +
+      # download-client checks (they're validated against Deezer, so a dummy can't create them).
+      # Empty when unset → the script injects a dummy ARL and skips those two checks.
+      DEEZER_ARL: ${{ secrets.DEEZER_ARL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,18 +42,30 @@ jobs:
             -e FLAC2CUSTOM_ARGS='-a "-vn -c:a libopus -b:a 64k" -e .opus -r \.mp3$' \
             lidarr-on-steroids:smoke
 
-      # Unblock autoconfig: setup/run waits for a 192-char arl in login.json. forceSave=true
-      # means the indexer/download-client save without a real Deezer login, so a dummy works.
-      - name: Inject dummy ARL
+      # Unblock autoconfig: setup/run waits for a 192-char arl in login.json. A dummy is enough
+      # for everything except the Deezer-validated indexer/download-client saves — those need a
+      # real ARL (DEEZER_ARL secret). REAL_ARL is exported so the script knows which to assert.
+      - name: Inject ARL
         run: |
-          ARL=$(printf 'a%.0s' $(seq 1 192))
+          if [ -n "$DEEZER_ARL" ]; then
+            ARL=$(printf '%s' "$DEEZER_ARL" | tr -d '[:space:]')
+            echo "REAL_ARL=1" >> "$GITHUB_ENV"
+            echo "Using real Deezer ARL from secret (length=${#ARL})."
+            if [ "${#ARL}" -ne 192 ]; then
+              echo "WARNING: ARL length is ${#ARL}, expected 192 — autoconfig may not unblock."
+            fi
+          else
+            ARL=$(printf 'a%.0s' $(seq 1 192))
+            echo "REAL_ARL=0" >> "$GITHUB_ENV"
+            echo "No DEEZER_ARL secret set; using dummy ARL (indexer/download-client checks will be skipped)."
+          fi
           for i in $(seq 1 10); do
-            if docker exec los sh -c "printf '{\"arl\":\"$ARL\"}' > /config_deemix/login.json"; then
-              echo "Dummy ARL written."; exit 0
+            if docker exec -e ARL="$ARL" los sh -c 'printf "{\"arl\":\"%s\"}" "$ARL" > /config_deemix/login.json'; then
+              echo "ARL written."; exit 0
             fi
             echo "Container not ready yet ($i)..."; sleep 1
           done
-          echo "ERROR: could not write dummy ARL into container."; exit 1
+          echo "ERROR: could not write ARL into container."; exit 1
 
       - name: Run smoke assertions
         run: bash .github/scripts/smoke-test.sh
