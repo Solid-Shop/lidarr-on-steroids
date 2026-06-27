@@ -26,7 +26,7 @@ jobs:
       DEEZER_ARL: ${{ secrets.DEEZER_ARL }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: true # lidarr-flac2mp3 is a submodule
 
