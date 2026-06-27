@@ -1,0 +1,189 @@
+name: Auto-update dependencies
+
+# Detects newer upstream versions of the two dependencies Dependabot can't track and opens a
+# PR for each:
+#   - Lidarr  : the base-image tag in the Dockerfile (ghcr.io/hotio/lidarr:nightly-X.Y.Z.B).
+#               Dependabot can't reliably parse hotio's "nightly-" prefixed 4-part tag.
+#   - Deemix  : a pinned git commit consumed via `git checkout <sha>` in a Dockerfile RUN —
+#               no Dependabot ecosystem tracks a git ref inside a RUN.
+# Everything else (GitHub Actions, the node base image, the submodule) is handled by Dependabot.
+#
+# Each bump lands as its own PR against main with a STABLE branch name, so a later run updates
+# the open PR in place instead of stacking duplicates. PRs are NOT auto-merged — the smoke-test
+# (.github/workflows/smoke-test.yml, now triggered on all branches/PRs) must pass and a human
+# should review, especially Deemix (upstream removed email/password login in favour of ARL-only).
+#
+# IMPORTANT — for the bot's PRs to actually trigger smoke-test, they must be pushed with a token
+# OTHER than the default GITHUB_TOKEN (GitHub suppresses workflow runs on GITHUB_TOKEN-created
+# events). Configure ONE of, in order of preference:
+#   1. A GitHub App (recommended; SOC 2-friendly: scoped, no human owner, ~1h auto-expiring token)
+#      installed on this repo with Contents:write + Pull requests:write, then set:
+#        - repo VARIABLE  APP_CLIENT_ID    = the App's Client ID
+#        - repo SECRET    APP_PRIVATE_KEY  = the App's .pem private key
+#   2. A fine-grained PAT from a bot account (Contents:write + Pull requests:write) as
+#        - repo SECRET    BOT_PAT
+# If neither is set, the bot still opens PRs using GITHUB_TOKEN, but you must manually run
+# smoke-test on them (re-run via "Run workflow", or close/reopen the PR) until a token is added.
+
+on:
+  schedule:
+    - cron: '17 6 * * *'   # daily, 06:17 UTC (off-peak)
+  workflow_dispatch:
+
+permissions:
+  contents: write        # commit the Dockerfile edit on the bump branch
+  pull-requests: write   # open / update the bump PR
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Lidarr base-image tag
+  # ---------------------------------------------------------------------------
+  lidarr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve latest hotio Lidarr nightly tag and bump Dockerfile
+        id: bump
+        run: |
+          set -euo pipefail
+
+          # Current pin from the Dockerfile (e.g. 3.1.3.4963).
+          CURRENT="$(sed -n 's#^FROM ghcr\.io/hotio/lidarr:nightly-\([0-9.]*\).*#\1#p' Dockerfile)"
+          if [ -z "$CURRENT" ]; then
+            echo "::error::Could not find the hotio/lidarr FROM line in Dockerfile."; exit 1
+          fi
+
+          # Authoritative source of truth = what ghcr actually has published.
+          # Anonymous pull token, then page the tag list following the Link: rel="next" cursor.
+          TOKEN="$(curl -fsS 'https://ghcr.io/token?scope=repository:hotio/lidarr:pull' | jq -r .token)"
+          url='https://ghcr.io/v2/hotio/lidarr/tags/list?n=1000'
+          # Scratch files in RUNNER_TEMP, NOT the repo — so create-pull-request can't commit them.
+          tags="$RUNNER_TEMP/tags.txt"; hdr="$RUNNER_TEMP/headers.txt"; body="$RUNNER_TEMP/body.json"
+          : > "$tags"
+          while [ -n "$url" ]; do
+            curl -fsS -D "$hdr" -H "Authorization: Bearer $TOKEN" "$url" -o "$body"
+            jq -r '.tags[]?' "$body" >> "$tags"
+            url="$(grep -i '^link:' "$hdr" | sed -n 's/.*<\([^>]*\)>; rel="next".*/https:\/\/ghcr.io\1/p' | head -1 || true)"
+          done
+
+          # Keep only strict nightly-3.1.x.x tags; numeric-sort by component; take the max.
+          LATEST="$( { grep -E '^nightly-3\.1\.[0-9]+\.[0-9]+$' "$tags" || true; } \
+            | sed 's/^nightly-//' \
+            | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n \
+            | tail -1 )"
+          if [ -z "$LATEST" ]; then
+            echo "::error::No nightly-3.1.x.x tags found on ghcr — refusing to guess."; exit 1
+          fi
+
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "latest=$LATEST"   >> "$GITHUB_OUTPUT"
+          if [ "$LATEST" = "$CURRENT" ]; then
+            echo "Lidarr already up to date ($CURRENT)."
+            echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          echo "Bumping Lidarr $CURRENT -> $LATEST"
+          # Match by pattern (not line number) so the edit survives line shifts.
+          sed -i -E "s#^(FROM ghcr\.io/hotio/lidarr:nightly-).*#\1$LATEST#" Dockerfile
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Generate GitHub App token
+        id: app-token
+        if: steps.bump.outputs.changed == 'true' && vars.APP_CLIENT_ID != ''
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Open / update PR
+        if: steps.bump.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          # App token -> PAT -> GITHUB_TOKEN. Only the first two make the PR trigger smoke-test.
+          token: ${{ steps.app-token.outputs.token || secrets.BOT_PAT || github.token }}
+          base: main
+          branch: auto-update/lidarr   # stable name -> idempotent update-in-place
+          add-paths: Dockerfile        # only ever commit the Dockerfile
+          delete-branch: true
+          commit-message: "Lidarr base image -> nightly-${{ steps.bump.outputs.latest }}"
+          title: "Bump Lidarr base image to nightly-${{ steps.bump.outputs.latest }}"
+          labels: dependencies, automated
+          body: |
+            Automated bump of the Lidarr base image in `Dockerfile`.
+
+            - **From:** `ghcr.io/hotio/lidarr:nightly-${{ steps.bump.outputs.current }}`
+            - **To:** `ghcr.io/hotio/lidarr:nightly-${{ steps.bump.outputs.latest }}`
+
+            Source of truth: the ghcr published-tag list for `hotio/lidarr`.
+            ⚠️ Do not merge until the **smoke-test** check passes.
+
+  # ---------------------------------------------------------------------------
+  # Deemix pinned commit
+  # ---------------------------------------------------------------------------
+  deemix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve latest Deemix commit and bump Dockerfile
+        id: bump
+        run: |
+          set -euo pipefail
+
+          # Current 40-char pin from the `git checkout <sha>` line.
+          CURRENT="$(sed -n 's#.*git checkout \([0-9a-f]\{40\}\).*#\1#p' Dockerfile | head -1)"
+          if [ -z "$CURRENT" ]; then
+            echo "::error::Could not find the Deemix 'git checkout <sha>' line in Dockerfile."; exit 1
+          fi
+
+          # HEAD of bambanah/deemix default branch (main). ls-remote needs no API token / rate limit.
+          LATEST="$(git ls-remote https://github.com/bambanah/deemix.git refs/heads/main | cut -f1)"
+          if [ -z "$LATEST" ]; then
+            echo "::error::Could not resolve bambanah/deemix main HEAD."; exit 1
+          fi
+
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "latest=$LATEST"   >> "$GITHUB_OUTPUT"
+          echo "short=${LATEST:0:12}" >> "$GITHUB_OUTPUT"
+          if [ "$LATEST" = "$CURRENT" ]; then
+            echo "Deemix already up to date ($CURRENT)."
+            echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          echo "Bumping Deemix $CURRENT -> $LATEST"
+          sed -i -E "s#(git checkout )[0-9a-f]{7,40}#\1$LATEST#" Dockerfile
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Generate GitHub App token
+        id: app-token
+        if: steps.bump.outputs.changed == 'true' && vars.APP_CLIENT_ID != ''
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Open / update PR
+        if: steps.bump.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ steps.app-token.outputs.token || secrets.BOT_PAT || github.token }}
+          base: main
+          branch: auto-update/deemix
+          add-paths: Dockerfile
+          delete-branch: true
+          commit-message: "Deemix -> ${{ steps.bump.outputs.short }}"
+          title: "Bump Deemix to ${{ steps.bump.outputs.short }}"
+          labels: dependencies, automated
+          body: |
+            Automated bump of the pinned Deemix commit in `Dockerfile`.
+
+            - **From:** `${{ steps.bump.outputs.current }}`
+            - **To:** `${{ steps.bump.outputs.latest }}`
+            - **Changes:** https://github.com/bambanah/deemix/compare/${{ steps.bump.outputs.current }}...${{ steps.bump.outputs.latest }}
+
+            ⚠️ Review carefully and wait for **smoke-test** — upstream Deemix removed
+            email/password login in favour of ARL-only, so this is behaviourally significant
+            for this fork. Do not auto-merge.
