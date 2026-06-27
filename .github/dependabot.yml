@@ -1,17 +1,34 @@
 version: 2
 
+# NOTE: Lidarr and Deemix are NOT auto-updated here, by design.
+#   - Lidarr: base image ghcr.io/hotio/lidarr:nightly-X.Y.Z.B in the Dockerfile. The "nightly-"
+#     prefix on a 4-part version sits in hotio's messy tag set, so Dependabot can't reliably
+#     bump it. Bumped manually on the lidarr-version-update branch (gated by the smoke test).
+#   - Deemix: pinned via `git checkout <sha>` in a Dockerfile RUN — no ecosystem tracks that.
+#     Also bumped manually on the lidarr-version-update branch.
+# Dependabot's real job here is GitHub Actions (+ node base, minor/patch; + the submodule).
+
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+    groups:
+      ci-actions:
+        patterns: ["*"]
 
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+    ignore:
+      # node base: stay on the 24.x track; bump majors manually
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+      # hotio/lidarr nightly tag is bumped manually on this branch (+ smoke-tested)
+      - dependency-name: "ghcr.io/hotio/lidarr"
 
   - package-ecosystem: "gitsubmodule"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
