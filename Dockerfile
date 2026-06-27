@@ -1,4 +1,4 @@
-FROM docker.io/library/node:24-alpine AS deemix
+FROM docker.io/library/node:26-alpine AS deemix
 
 RUN apk add --no-cache git python3 make g++ && \
     npm install -g pnpm turbo
