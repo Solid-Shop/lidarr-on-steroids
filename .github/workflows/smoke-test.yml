@@ -1,22 +1,40 @@
 name: Smoke test
 
-# Runs in tandem with Docker CI on the version-bump branch. Docker CI proves the image
-# *builds* (multi-arch); this proves a Lidarr/Deemix version bump didn't break the custom
-# integration on top (Caddy proxy, track-picker sidecar, UI injection, Lidarr autoconfig).
+# Runs in tandem with Docker CI on every branch and PR. Docker CI proves the image
+# *builds* (multi-arch); this proves a change (e.g. a Lidarr/Deemix version bump from the
+# auto-update bot) didn't break the custom integration on top (Caddy proxy, track-picker
+# sidecar, UI injection, Lidarr autoconfig).
 # Most checks need no credentials (a dummy ARL unblocks autoconfig). The Deemix indexer +
 # download-client checks need a real ARL: set the DEEZER_ARL repo secret to enable them,
 # otherwise they're skipped. See .github/scripts/smoke-test.sh for details.
 on:
+  # Run on EVERY branch push (feature branches + the auto-update bot's auto-update/* branches)
+  # to prove the full integration end-to-end, not just that the image builds.
+  #
+  # CAVEAT: paths-ignore skips the ~15-30min build on docs-only changes. Do NOT promote
+  # smoke-test to a REQUIRED status check while paths-ignore is set — a docs-only PR would be
+  # skipped, never report the check, and be blocked from merging. If you require it, remove
+  # paths-ignore (or add an always-green gate job that reports the required context).
   push:
-    branches: [lidarr-version-update]
+    branches: ['**']
+    paths-ignore: ['**.md', 'LICENSE', '.github/ISSUE_TEMPLATE/**']
+  # pull_request adds coverage for FORK PRs only (their code never lands as a push in this
+  # repo). Same-repo PRs are already covered by their branch push above — the job-level `if`
+  # below drops the duplicate so each commit is smoke-tested exactly once.
+  pull_request:
+    paths-ignore: ['**.md', 'LICENSE', '.github/ISSUE_TEMPLATE/**']
   workflow_dispatch:
 
 concurrency:
-  group: smoke-${{ github.ref }}
+  # Keyed by PR number when it's a PR, else the branch ref; cancels a superseded ~30-min build.
+  group: smoke-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   smoke:
+    # Push covers same-repo branches; pull_request only earns its keep for forks. This guard
+    # means same-repo PRs don't build twice (once for push, once for pull_request).
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
