@@ -4,7 +4,7 @@ RUN apk add --no-cache git python3 make g++ && \
     npm install -g pnpm turbo
 
 RUN git clone https://github.com/bambanah/deemix.git /app && \
-    cd /app && git checkout 9d63c3636ad8a31ee69f2d0be81d1d53a107268c
+    cd /app && git checkout 3ac2576fd228972793d41015d0284a32c9bca8e5
 
 WORKDIR /app
 RUN pnpm install --frozen-lockfile
