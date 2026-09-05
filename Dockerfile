@@ -16,7 +16,7 @@ RUN sed -i 's/=> channelNewReleases(dz, c)/=> channelNewReleases(dz, c).catch(()
 RUN pnpm turbo build --filter=deemix-webui...
 
 
-FROM ghcr.io/hotio/lidarr:nightly-3.1.3.4987
+FROM ghcr.io/hotio/lidarr:nightly-3.1.5.5066
 
 LABEL maintainer="solidshop"
 
